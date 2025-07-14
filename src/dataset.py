@@ -102,63 +102,54 @@ class CharCorruptionDataset(Dataset):
         # TODO [part e]: see spec above
         ### YOUR CODE HERE ###
         # pass
-        # 0. Get the document at the given index
-        document = self.data[idx]
-
-        # 1. Randomly truncate the document to length between 4 and int(block_size * 7/8)
-        max_length = int(self.block_size * 7/8)
-        min_length = 4
-        # Ensure we don't exceed the maximum length
-        max_possible_length = min(max_length, len(document))
-        if max_possible_length < min_length:
-            #document is too short, pad it or use whole document
-            truncated_length = min(len(document), min_length)
-        else:
-            truncated_length = random.randint(min_length, max_possible_length)
+        # 0. Retrieve document
+        doc = self.data[idx]
         
-        #Randomly choose starting position for truncation
-        if len(document) <= truncated_length:
-            truncated_doc = document
-        else:
-            start_pos = random.randint(0, len(document) - truncated_length)
-            truncated_doc = document[start_pos:start_pos + truncated_length]
+        # Handle very short documents
+        if len(doc) < 4:
+            doc = doc + self.PAD_CHAR * (4 - len(doc))
         
-        # 2. Break the truncated document into [prefix] [masked_content] [suffix]
-        #Length of masked_content should be random, averaging 1/4 of truncated length
-        doc_length = len(truncated_doc)
-        avg_mask_length = doc_length // 4
-
-        #Make it random around the average (between 1 and doc_length-2 to ensure prefix and suffix exist)
-        max_mask_length = max(1, doc_length - 2)
-        mask_length = random.randint(1, min(max_mask_length, max(1, avg_mask_length * 2)))
-
-        #Randomly choose where to plcae the mask
-        max_start_pos = max(1, doc_length - mask_length - 1)
-        mask_start = random.randint(1, max_start_pos)
-        mask_end = mask_start + mask_length
-
+        # 1. Randomly truncate document
+        max_len = int(self.block_size * 7 / 8)
+        trunc_len = random.randint(4, min(len(doc), max_len))
+        
+        # Random starting point if document is longer than trunc_len
+        if len(doc) > trunc_len:
+            start_idx = random.randint(0, len(doc) - trunc_len)
+            truncated_doc = doc[start_idx:start_idx + trunc_len]
+        else:
+            truncated_doc = doc[:trunc_len]
+        
+        # 2. Break document into three parts
+        # Calculate masked_content length (average 1/4 of truncated document)
+        masked_len = int(random.gauss(trunc_len / 4, trunc_len / 8))
+        masked_len = max(1, min(masked_len, trunc_len - 2))  # Ensure valid length
+        
+        # Random position to start masked content
+        mask_start = random.randint(1, trunc_len - masked_len)
+        
         prefix = truncated_doc[:mask_start]
-        masked_content = truncated_doc[mask_start:mask_end]
-        suffix = truncated_doc[mask_end:]
-
-        # 3. Rearrange into: [prefix] MASK_CHAR [suffix] MASK_CHAR [masked_content] [pads]
-        rearranged = prefix + self.MASK_CHAR + suffix + self.MASK_CHAR + masked_content
+        masked_content = truncated_doc[mask_start:mask_start + masked_len]
+        suffix = truncated_doc[mask_start + masked_len:]
         
-        # Calculate padding needed to reach block_size + 1
-        pad_length = self.block_size + 1 - len(rearranged)
-        if pad_length > 0:
-            masked_string = rearranged + self.PAD_CHAR * pad_length
+        # 3. Rearrange into required format
+        masked_string = prefix + self.MASK_CHAR + suffix + self.MASK_CHAR + masked_content
+        
+        # Add padding to reach required length
+        padding_len = self.block_size + 1 - len(masked_string)
+        if padding_len > 0:
+            masked_string = masked_string + self.PAD_CHAR * padding_len
         else:
-            # If somehow too long, truncate
-            masked_string = rearranged[:self.block_size + 1]
+            # If too long, truncate
+            masked_string = masked_string[:self.block_size + 1]
         
-        # 4. Create input and output pairs
-        input_string = masked_string[:-1]  # Remove last character
-        output_string = masked_string[1:]   # Remove first character
+        # 4. Create input/output pair
+        x = masked_string[:-1]
+        y = masked_string[1:]
         
-        # 5. Encode as Long tensors using vocabulary
-        x = torch.tensor([self.stoi[c] for c in input_string], dtype=torch.long)
-        y = torch.tensor([self.stoi[c] for c in output_string], dtype=torch.long)
+        # 5. Encode as tensors
+        x = torch.tensor([self.stoi[c] for c in x], dtype=torch.long)
+        y = torch.tensor([self.stoi[c] for c in y], dtype=torch.long)
         
         return x, y
 
