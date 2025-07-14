@@ -66,7 +66,9 @@ model = None
 if args.variant == 'vanilla':
     # TODO: [part c] Make some model here
     ### YOUR CODE HERE ###
-    pass
+    # pass
+    model = models.GPT(mconf)
+    model = model.to(device)
     ### END YOUR CODE ###
 elif args.variant == 'rope':
     # TODO: [part g] Make some other model here
@@ -129,19 +131,48 @@ elif args.function == 'finetune':
     #         num_workers=4
     #         writer=writer
     #     [part f] Hyperparameters for finetuning WITH a pretrained model:
-    #         max_epochs=10
-    #         batch_size=256
-    #         learning_rate=args.finetune_lr
-    #         lr_decay=True
-    #         warmup_tokens=512*20
-    #         final_tokens=200*len(pretrain_dataset)*block_size
-    #         num_workers=4
-    #         writer=writer
+            # max_epochs=10
+            # batch_size=256
+            # learning_rate=args.finetune_lr
+            # lr_decay=True
+            # warmup_tokens=512*20
+            # final_tokens=200*len(pretrain_dataset)*block_size
+            # num_workers=4
+            # writer=writer
     #     You can use the args.reading_params_path flag to switch between the
     #     number of epochs for each case.
 
     ### YOUR CODE HERE ###
-    pass
+    # pass
+    #Create the finetune dataset
+    finetune_text = open(args.finetune_corpus_path, encoding='utf-8').read()
+    finetune_dataset = dataset.NameDataset(pretrain_dataset, finetune_text)
+
+    # Load pretrained parameters if specified
+    if args.reading_params_path is not None:
+        model.load_state_dict(torch.load(args.reading_params_path))
+        max_epochs = 10
+    else:
+        max_epochs = 75
+
+    # Config trainer for finetuning
+    tconf = trainer.TrainerConfig(
+        max_epochs=max_epochs,
+        batch_size=256,
+        learning_rate=args.finetune_lr,
+        lr_decay=True,
+        warmup_tokens=512*20,
+        final_tokens=200*len(pretrain_dataset)*block_size,
+        num_workers=4,
+        writer=writer
+    )
+
+    # Create trainer and start finetuning
+    trainer_obj = trainer.Trainer(model,finetune_dataset,None,tconf)
+    trainer_obj.train()
+
+    
+
     ### END YOUR CODE ###
 elif args.function == 'evaluate':
     assert args.outputs_path is not None
