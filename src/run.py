@@ -74,7 +74,9 @@ elif args.variant == 'rope':
     # TODO: [part g] Make some other model here
     # set mconf.rope parameter
     ### YOUR CODE HERE ###
-    pass
+    mconf.rope = True
+    model = models.GPT(mconf)
+    model = model.to(device)
     ### END YOUR CODE ###
 else:
     raise ValueError("Unknown model variant")
